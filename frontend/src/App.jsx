@@ -24,6 +24,7 @@ const formatDate = (value) =>
 
 function App() {
   const [mode, setMode] = useState("login");
+  const [activeView, setActiveView] = useState("overview");
   const [authForm, setAuthForm] = useState(initialAuthForm);
   const [shopForm, setShopForm] = useState(shopFormDefaults);
   const [token, setToken] = useState(localStorage.getItem("smartqueue_token") || "");
@@ -132,6 +133,7 @@ function App() {
       return;
     }
 
+    setActiveView(user.role === "admin" ? "owner" : "customer");
     refreshAll(selectedShopId);
   }, [user?.role]);
 
@@ -177,6 +179,7 @@ function App() {
   const handleLogout = () => {
     setToken("");
     setUser(null);
+    setActiveView("overview");
     setMyTokens([]);
     setOwnerView({ shop: null, queueItems: [] });
     setAnalytics(null);
@@ -328,7 +331,7 @@ function App() {
 
       <main className="content-panel">
         <header className="topbar">
-          <div>
+          <div className="topbar-copyblock">
             <p className="eyebrow">Queue operations</p>
             <h2>{user ? `Welcome, ${user.name}` : "Professional queue experience"}</h2>
             <p className="topbar-copy">
@@ -347,6 +350,29 @@ function App() {
             ) : null}
           </div>
         </header>
+
+        <section className="view-switcher card">
+          <button
+            className={activeView === "overview" ? "view-tab active" : "view-tab"}
+            onClick={() => setActiveView("overview")}
+          >
+            Queue board
+          </button>
+          <button
+            className={activeView === "customer" ? "view-tab active" : "view-tab"}
+            onClick={() => setActiveView("customer")}
+            disabled={user?.role === "admin"}
+          >
+            Customer page
+          </button>
+          <button
+            className={activeView === "owner" ? "view-tab active" : "view-tab"}
+            onClick={() => setActiveView("owner")}
+            disabled={user?.role === "customer"}
+          >
+            Owner page
+          </button>
+        </section>
 
         {message ? <div className="feedback success">{message}</div> : null}
         {error ? <div className="feedback error">{error}</div> : null}
@@ -414,12 +440,39 @@ function App() {
           </section>
         ) : null}
 
-        <section className="layout-grid">
-          <section className="card">
+        {activeView === "overview" ? (
+          <section className="page-stack">
+            <section className="card page-hero">
+              <div className="page-hero-copy">
+                <p className="eyebrow">Live public page</p>
+                <h3>Queue visibility for every visitor.</h3>
+                <p className="section-copy">
+                  Customers can explore available shops, see the token currently being served,
+                  and join the queue without standing in line.
+                </p>
+              </div>
+              <div className="page-hero-summary">
+                <div className="summary-tile">
+                  <span>Serving now</span>
+                  <strong>
+                    {selectedShopStatus?.currentlyServing
+                      ? `${selectedShop?.queuePrefix}-${String(selectedShopStatus.currentlyServing).padStart(3, "0")}`
+                      : "Idle"}
+                  </strong>
+                </div>
+                <div className="summary-tile">
+                  <span>Next token</span>
+                  <strong>{selectedShopStatus?.nextToken || "Waiting for customers"}</strong>
+                </div>
+              </div>
+            </section>
+
+            <section className="card board-card">
             <div className="section-heading">
               <div>
                 <p className="eyebrow">Public queue board</p>
                 <h3>Available shops</h3>
+                <p className="section-copy">Choose a shop to view live queue progress and current crowd.</p>
               </div>
 
               <select value={selectedShopId} onChange={handleShopSelection}>
@@ -484,14 +537,91 @@ function App() {
                 Join selected queue
               </button>
             ) : null}
+            </section>
           </section>
+        ) : null}
 
-          {user?.role === "customer" ? (
-            <section className="card">
+        {activeView === "customer" ? (
+          user?.role === "customer" ? (
+            <section className="page-stack">
+              <section className="card page-hero">
+                <div className="page-hero-copy">
+                  <p className="eyebrow">Customer page</p>
+                  <h3>Track your place without waiting physically.</h3>
+                  <p className="section-copy">
+                    Join a queue, watch the current token, and keep your token history in one place.
+                  </p>
+                </div>
+                <div className="page-hero-summary">
+                  <div className="summary-tile">
+                    <span>Active token</span>
+                    <strong>{activeCustomerToken?.tokenLabel || "None"}</strong>
+                  </div>
+                  <div className="summary-tile">
+                    <span>History count</span>
+                    <strong>{myTokens.length}</strong>
+                  </div>
+                </div>
+              </section>
+
+              <section className="layout-grid layout-grid-single-right">
+                <section className="card">
+                  <div className="section-heading">
+                    <div>
+                      <p className="eyebrow">Join queue</p>
+                      <h3>Pick a shop and join digitally</h3>
+                      <p className="section-copy">Use the public board here directly from your customer page.</p>
+                    </div>
+                  </div>
+
+                  <div className="shop-selection-card">
+                    <select value={selectedShopId} onChange={handleShopSelection}>
+                      <option value="">Select a shop</option>
+                      {shops.map((shop) => (
+                        <option key={shop._id} value={shop._id}>
+                          {shop.name}
+                        </option>
+                      ))}
+                    </select>
+
+                    {selectedShop ? (
+                      <div className="shop-preview compact">
+                        <h4>{selectedShop.name}</h4>
+                        <p>{selectedShop.description}</p>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="metrics-grid">
+                    <div className="metric-card">
+                      <span>Serving</span>
+                      <strong>
+                        {selectedShopStatus?.currentlyServing
+                          ? `${selectedShop?.queuePrefix}-${String(selectedShopStatus.currentlyServing).padStart(3, "0")}`
+                          : "Idle"}
+                      </strong>
+                    </div>
+                    <div className="metric-card">
+                      <span>Next token</span>
+                      <strong>{selectedShopStatus?.nextToken || "Waiting for customers"}</strong>
+                    </div>
+                    <div className="metric-card">
+                      <span>Waiting</span>
+                      <strong>{selectedShopStatus?.summary?.waiting || 0}</strong>
+                    </div>
+                  </div>
+
+                  <button className="primary-button" onClick={handleJoinQueue} disabled={loading || !selectedShopId}>
+                    Join selected queue
+                  </button>
+                </section>
+
+                <section className="card">
               <div className="section-heading">
                 <div>
                   <p className="eyebrow">Customer view</p>
                   <h3>Your tokens</h3>
+                  <p className="section-copy">See your active token first, then review previous queue activity.</p>
                 </div>
               </div>
 
@@ -529,16 +659,38 @@ function App() {
                   </div>
                 ))}
               </div>
+                </section>
+              </section>
             </section>
-          ) : null}
+          ) : (
+            <section className="card empty-state">
+              <p className="eyebrow">Customer page</p>
+              <h3>Login as a customer to use this page.</h3>
+              <p className="section-copy">You can still explore the queue board from the overview page.</p>
+            </section>
+          )
+        ) : null}
 
-          {user?.role === "admin" ? (
+        {activeView === "owner" ? (
+          user?.role === "admin" ? (
             !ownerView.shop ? (
-              <section className="card">
+              <section className="page-stack">
+                <section className="card page-hero">
+                  <div className="page-hero-copy">
+                    <p className="eyebrow">Owner page</p>
+                    <h3>Create your business queue workspace.</h3>
+                    <p className="section-copy">
+                      Set up your shop details once, then start managing live customer flow from the dashboard.
+                    </p>
+                  </div>
+                </section>
+
+                <section className="card form-card-wide">
                 <div className="section-heading">
                   <div>
                     <p className="eyebrow">Owner setup</p>
                     <h3>Create your shop</h3>
+                    <p className="section-copy">Add professional business details for your virtual queue.</p>
                   </div>
                 </div>
 
@@ -593,14 +745,37 @@ function App() {
                     Create shop
                   </button>
                 </form>
+                </section>
               </section>
             ) : (
-              <>
-                <section className="card">
+              <section className="page-stack">
+                <section className="card page-hero">
+                  <div className="page-hero-copy">
+                    <p className="eyebrow">Owner page</p>
+                    <h3>Manage your shop queue with a dedicated control panel.</h3>
+                    <p className="section-copy">
+                      Call the next token, watch queue flow, and review today&apos;s performance metrics.
+                    </p>
+                  </div>
+                  <div className="page-hero-summary">
+                    <div className="summary-tile">
+                      <span>Queue status</span>
+                      <strong>{ownerView.shop.status}</strong>
+                    </div>
+                    <div className="summary-tile">
+                      <span>Today&apos;s customers</span>
+                      <strong>{analytics?.metrics?.totalCustomersToday || 0}</strong>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="layout-grid">
+                  <section className="card">
                   <div className="section-heading">
                     <div>
                       <p className="eyebrow">Owner dashboard</p>
                       <h3>{ownerView.shop.name}</h3>
+                      <p className="section-copy">Operate today&apos;s queue in real time from this page.</p>
                     </div>
 
                     <button className="ghost-button" onClick={handleShopStatusToggle}>
@@ -655,13 +830,14 @@ function App() {
                       </div>
                     ))}
                   </div>
-                </section>
+                  </section>
 
-                <section className="card">
+                  <section className="card">
                   <div className="section-heading">
                     <div>
                       <p className="eyebrow">Daily analytics</p>
                       <h3>Today&apos;s performance</h3>
+                      <p className="section-copy">Track daily queue volume and average handling pace.</p>
                     </div>
                   </div>
 
@@ -679,11 +855,18 @@ function App() {
                       <strong>{analytics?.metrics?.averageServiceTimeMinutes || 0} min</strong>
                     </div>
                   </div>
+                  </section>
                 </section>
-              </>
+              </section>
             )
-          ) : null}
-        </section>
+          ) : (
+            <section className="card empty-state">
+              <p className="eyebrow">Owner page</p>
+              <h3>Login as a shop owner to use this page.</h3>
+              <p className="section-copy">Create or manage a queue once you are signed in with an owner account.</p>
+            </section>
+          )
+        ) : null}
       </main>
     </div>
   );
